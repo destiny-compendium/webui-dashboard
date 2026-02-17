@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Service Control Panel</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #eee;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    .status {
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      display: inline-block;
+      font-weight: bold;
+    }
+
+    .active { background: #1f6f1f; }
+    .inactive { background: #7f1d1d; }
+    .unknown { background: #444; }
+
+    button {
+      padding: 8px 12px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #555;
+    }
+
+    #logs {
+      background: black;
+      padding: 10px;
+      height: 400px;
+      overflow-y: scroll;
+      white-space: pre-wrap;
+      border: 1px solid #333;
+    }
+
+    #tokenInput {
+      width: 300px;
+      margin-bottom: 10px;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Service Control Panel</h1>
+
+<input type="text" id="tokenInput" placeholder="Enter auth token" />
+<button onclick="saveToken()">Save Token</button>
+
+<h2>Status</h2>
+<div id="status" class="status unknown">Loading...</div>
+
+<h2>Controls</h2>
+<button onclick="sendCommand('start')">Start</button>
+<button onclick="sendCommand('stop')">Stop</button>
+<button onclick="sendCommand('restart')">Restart</button>
+<button onclick="deploy()">Deploy</button>
+
+<h2>Live Logs</h2>
+<div id="logs"></div>
+
+<script>
+  let token = localStorage.getItem("authToken") || "";
+
+  if (token) {
+    document.getElementById("tokenInput").value = token;
+  }
+
+  function saveToken() {
+    token = document.getElementById("tokenInput").value;
+    localStorage.setItem("authToken", token);
+    alert("Token saved");
+  }
+
+  function authHeaders() {
+    return {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json"
+    };
+  }
+
+  async function fetchStatus() {
+    try {
+      const res = await fetch("/status", {
+        headers: authHeaders()
+      });
+
+      const data = await res.json();
+      const text = data.output || "";
+
+      const active = text.includes("ActiveState=active");
+
+      const statusDiv = document.getElementById("status");
+      statusDiv.textContent = active ? "ACTIVE" : "INACTIVE";
+      statusDiv.className = "status " + (active ? "active" : "inactive");
+
+    } catch (err) {
+      document.getElementById("status").textContent = "ERROR";
+      document.getElementById("status").className = "status unknown";
+    }
+  }
+
+  async function sendCommand(cmd) {
+    await fetch("/" + cmd, {
+      method: "POST",
+      headers: authHeaders()
+    });
+
+    setTimeout(fetchStatus, 1000);
+  }
+
+  async function deploy() {
+    await fetch("/deploy", {
+      method: "POST",
+      headers: authHeaders()
+    });
+
+    setTimeout(fetchStatus, 3000);
+  }
+
+  function startLogStream() {
+    const logsDiv = document.getElementById("logs");
+    const eventSource = new EventSource("/logs/stream?token=" + token);
+
+    eventSource.onmessage = function(event) {
+      logsDiv.textContent += event.data;
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+    };
+
+    eventSource.onerror = function() {
+      logsDiv.textContent += "\n[Log stream disconnected]\n";
+    };
+  }
+
+  // Auto refresh status every 5s
+  setInterval(fetchStatus, 5000);
+
+  fetchStatus();
+  startLogStream();
+</script>
+
+</body>
+</html>
