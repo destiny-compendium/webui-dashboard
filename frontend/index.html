@@ -77,11 +77,10 @@
 <div id="logs"></div>
 
 <script>
-  let token = localStorage.getItem("authToken") || "";
+  const BASE = "/backend"; // <-- Prefix path
 
-  if (token) {
-    document.getElementById("tokenInput").value = token;
-  }
+  let token = localStorage.getItem("authToken") || "";
+  if (token) document.getElementById("tokenInput").value = token;
 
   function saveToken() {
     token = document.getElementById("tokenInput").value;
@@ -98,60 +97,46 @@
 
   async function fetchStatus() {
     try {
-      const res = await fetch("/status", {
-        headers: authHeaders()
-      });
-
+      const res = await fetch(`${BASE}/status`, { headers: authHeaders() });
       const data = await res.json();
       const text = data.output || "";
-
       const active = text.includes("ActiveState=active");
 
       const statusDiv = document.getElementById("status");
       statusDiv.textContent = active ? "ACTIVE" : "INACTIVE";
       statusDiv.className = "status " + (active ? "active" : "inactive");
-
-    } catch (err) {
-      document.getElementById("status").textContent = "ERROR";
-      document.getElementById("status").className = "status unknown";
+    } catch {
+      const statusDiv = document.getElementById("status");
+      statusDiv.textContent = "ERROR";
+      statusDiv.className = "status unknown";
     }
   }
 
   async function sendCommand(cmd) {
-    await fetch("/" + cmd, {
-      method: "POST",
-      headers: authHeaders()
-    });
-
+    await fetch(`${BASE}/${cmd}`, { method: "POST", headers: authHeaders() });
     setTimeout(fetchStatus, 1000);
   }
 
   async function deploy() {
-    await fetch("/deploy", {
-      method: "POST",
-      headers: authHeaders()
-    });
-
+    await fetch(`${BASE}/deploy`, { method: "POST", headers: authHeaders() });
     setTimeout(fetchStatus, 3000);
   }
 
   function startLogStream() {
     const logsDiv = document.getElementById("logs");
-    const eventSource = new EventSource("/logs/stream?token=" + token);
+    const eventSource = new EventSource(`${BASE}/logs/stream?token=${token}`);
 
-    eventSource.onmessage = function(event) {
+    eventSource.onmessage = (event) => {
       logsDiv.textContent += event.data;
       logsDiv.scrollTop = logsDiv.scrollHeight;
     };
 
-    eventSource.onerror = function() {
+    eventSource.onerror = () => {
       logsDiv.textContent += "\n[Log stream disconnected]\n";
     };
   }
 
-  // Auto refresh status every 5s
-  setInterval(fetchStatus, 5000);
-
+  setInterval(fetchStatus, 3000);
   fetchStatus();
   startLogStream();
 </script>

@@ -6,10 +6,14 @@ const app = express();
 app.use(express.json());
 
 const PORT = 3000;
-const AUTH_TOKEN = "super-secret-token";
-const SERVICE = "myservice.service";
-const PROJECT_DIR = "/var/www/myapp";
+const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const SERVICE = process.env.SERVICE
+const PROJECT_DIR = process.env.PROJECT_DIR;
 
+if (!AUTH_TOKEN || !SERVICE || !PROJECT_DIR) {
+  console.error("You done goofed (ENVVARS are fucked)");
+  process.exit(1);
+}
 // ------------------------
 // AUTH MIDDLEWARE
 // ------------------------
